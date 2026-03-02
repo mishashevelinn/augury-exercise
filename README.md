@@ -19,6 +19,9 @@ This setup lets you keep the embedded device and samples reader running on the V
 #### On the other machine (local)
 initialize and activate python virtual environment:
 
+cd to the project root(augury-exercise) and do
+
+
 `python3 -m venv venv`
 
 `source venv/bin/activate`
@@ -56,8 +59,8 @@ You can verify the VM's API is reachable from local:
 This creates/updates local /tmp/shmem_data with the same binary layout as on the VM.
  Run the Graph Server Locally
 
-- Run graph server :
-`python3 graph_server.py`
+- Run graph server in other terminal with activated venv :
+`python3 remote_graph_server/graph_server.py`
 
 By default, it listens on 0.0.0.0:5000. Open:
 http://localhost:5000/

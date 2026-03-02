@@ -2,7 +2,6 @@
 """
 VM-side data API server. Reads from /tmp/shmem_data (same layout as graph_server)
 and exposes HTTP API for remote clients to fetch current sample data.
-Does not modify graph_webserver or samples_reader.
 """
 from flask import Flask, jsonify
 import ctypes
@@ -40,21 +39,19 @@ def open_shmem():
 app = Flask(__name__)
 
 # One shared-mem view per process; struct fields reflect current data on each read
+# The data accumulated in the shared memory
 _shmem_file = None
 _shmem_buf = None
 _shmem_struct = None
 
 
 def get_shmem():
-    global _shmem_file, _shmem_buf, _shmem_struct
-    if _shmem_struct is None:
-        _shmem_file, _shmem_buf, _shmem_struct = open_shmem()
     return _shmem_struct
 
 
 @app.route("/samples")
 def samples():
-    """Return current sample data as JSON for remote clients (e.g. local machine)."""
+    """Return current sample data as JSON for remote clients."""
     try:
         s = get_shmem()
     except FileNotFoundError:
@@ -77,20 +74,21 @@ def samples():
 
 @app.route("/health")
 def health():
-    """Simple health check."""
+    """Quick health check."""
     return jsonify(status="ok")
 
 
-@app.after_request
-def cors_headers(response):
-    """Allow browsers on other hosts (e.g. local machine) to call this API."""
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type"
-    return response
-
 
 def main():
+    # Initialize shared memory for samples reader
+    global _shmem_file, _shmem_buf, _shmem_struct
+    _shmem_file, _shmem_buf, _shmem_struct = open_shmem()
+
+    if _shmem_struct.max_samples == 0:
+        _shmem_struct.max_samples = MAX_SAMPLES
+        _shmem_struct.next_sample = 0
+
+    # Run server
     host = "0.0.0.0"
     port = 5001
     app.run(host=host, port=port, debug=False, threaded=True)

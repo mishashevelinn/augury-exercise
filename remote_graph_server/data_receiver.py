@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Local client: fetches /samples from VM (localhost:5001 via SSH tunnel),
+Remote client: fetches /samples from VM (localhost:5001 via SSH tunnel),
 writes into local /tmp/shmem_data so graph_server.py can run locally and plot.
 """
 import ctypes
@@ -26,31 +26,33 @@ class SharedMemStruct(ctypes.Structure):
 
 
 def ensure_shmem_file():
-    """Create or truncate local shared memory file to the right size."""
+    """Ensure /tmp/shmem_data exists and looks like the right size; otherwise fail."""
     struct_size = ctypes.sizeof(SharedMemStruct)
-    with open(SHARED_FNAME, "wb") as f:
-        f.truncate(struct_size)
-    os.chmod(SHARED_FNAME, 0o666)
+    if not os.path.exists(SHARED_FNAME):
+        raise RuntimeError(f"{SHARED_FNAME} does not exist. Start graph_server.py first.")
+    if os.path.getsize(SHARED_FNAME) != struct_size:
+        raise RuntimeError(
+            f"{SHARED_FNAME} has wrong size (got {os.path.getsize(SHARED_FNAME)}, "
+            f"expected {struct_size}). Make sure graph_server.py created it."
+        )
 
 
 def write_snapshot(data: dict):
-    """Write API response into local /tmp/shmem_data (binary layout for graph_server)."""
     struct_size = ctypes.sizeof(SharedMemStruct)
     with open(SHARED_FNAME, "r+b") as f:
-        f.truncate(struct_size)
         buf = bytearray(struct_size)
-        # Header: 4 ints (each 4 bytes on typical 32/64-bit)
         base = 0
         for key in ("max_samples", "sample_freq", "next_sample", "total_samples"):
             val = data.get(key, 0)
             ctypes.c_int.from_buffer(buf, base).value = val
             base += ctypes.sizeof(ctypes.c_int)
-        # sample_array: c_int8 per sample
+
         samples = data.get("samples", [])
         for i, v in enumerate(samples):
             if i >= MAX_SAMPLES:
                 break
-            ctypes.c_int8.from_buffer(buf, base + i).value = v & 0xFF if isinstance(v, int) else 0
+            ctypes.c_int8.from_buffer(buf, base + i).value = v
+
         f.seek(0)
         f.write(buf)
 

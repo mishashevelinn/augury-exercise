@@ -3,16 +3,17 @@ This setup lets you keep the embedded device and samples reader running on the V
 ### 1. Components
 - On the VM:
 
-`embedded_device (QEMU)`
+`embedded_device` - Produces samples
 
-`samples_reader`
+`samples_reader` - Consumes samples via UART, writes structured samples to `/tmp/shmem_data`
 
 `data_server`  - Flask API exposing `/health` and `/samples` from `/tmp/shmem_data`
 
 - On the other machine (local):
 
-`data_receiver.py` – pulls data from the VM API and writes it into local /tmp/shmem_data
-graph_server.py – copied from the VM’s graph_webserver and run locally
+`data_fetcher.py` – pulls data from the VM API and writes it into local /tmp/shmem_data
+
+`graph_server.py` – copied from the VM’s graph_webserver and run locally
 ### 2. Pre‑requisites
 
 #### On the other machine (local)
@@ -36,23 +37,20 @@ Keep this SSH session open.
 You can verify the VM's API is reachable from local:
 
 `curl http://localhost:5001/health# -> {"status":"ok"}`
-### 4. Start data acquisition and rendering
+### 3. Start data acquisition and rendering
  
 - #### On the VM:
   run embedded_device and sample_reader as described in the assignment
+  or use `run_sampler.sh`
 
 - #### On the other machine (local):
-- single snapshot (after sampling is done):
-
-    `python3 local_client.py --once`
-
 - continuous mirroring (live updates):
 
-   ` python3 data_receiver.py`
+   ` python3 remote_graph_server/data_fetcher.py`
 
 - optional - change polling interval
 
-   `python3 local_client.py --interval 0.2`
+   `python3 remote_graph_server/data_fetcher.py --interval 0.2`
 
 
 This creates/updates local /tmp/shmem_data with the same binary layout as on the VM.
